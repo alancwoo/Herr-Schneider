@@ -1,5 +1,13 @@
 # Builds installers for macOS, Windows and Linux and attaches them to a GitHub Release.
-# Trigger: push a tag like v0.1.0  (git tag v0.1.0 && git push origin v0.1.0)
+# Trigger: push a tag like v0.1.0  (npm version 0.1.0 && git push origin main --tags)
+#
+# macOS signing + notarization uses these repository secrets (Settings → Secrets → Actions):
+#   CSC_LINK                     base64 of your "Developer ID Application" .p12
+#   CSC_KEY_PASSWORD             password for that .p12
+#   APPLE_ID                     Apple ID email
+#   APPLE_APP_SPECIFIC_PASSWORD  app-specific password from appleid.apple.com
+#   APPLE_TEAM_ID                10-character Team ID
+# Without them the macOS build is produced unsigned.
 name: Release
 
 on:
@@ -30,9 +38,23 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Build and publish
+
+      - name: Build and publish (macOS, signed + notarized when secrets are set)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ -n "$APPLE_ID" ]; then NOTARIZE="-c.mac.notarize=true"; else echo "No Apple credentials: building unsigned"; NOTARIZE=""; fi
+          npx electron-builder ${{ matrix.args }} $NOTARIZE --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Build and publish (Windows / Linux)
+        if: runner.os != 'macOS'
         run: npx electron-builder ${{ matrix.args }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Unsigned macOS builds; set CSC_LINK / CSC_KEY_PASSWORD secrets to sign.
-          CSC_IDENTITY_AUTO_DISCOVERY: false

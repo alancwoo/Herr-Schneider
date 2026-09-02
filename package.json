@@ -43,7 +43,12 @@
           ]
         }
       ],
-      "artifactName": "Herr-Schneider-${version}-mac-${arch}.${ext}"
+      "artifactName": "Herr-Schneider-${version}-mac-${arch}.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "type": "distribution"
     },
     "win": {
       "target": [

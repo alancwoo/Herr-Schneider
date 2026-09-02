@@ -22,7 +22,7 @@ Paste a link or drop a file. Mark in and out. Export.</p>
 
 ## Download
 
-Installers for macOS, Windows and Linux are on the [Releases](https://github.com/alancwoo/Herr-Schneider/releases) page. The macOS build is unsigned, so on first launch right-click the app and choose Open, or run `xattr -cr "/Applications/Herr Schneider.app"`.
+Installers for macOS, Windows and Linux are on the [Releases](https://github.com/alancwoo/Herr-Schneider/releases) page. The macOS build is signed and notarized.
 
 ## Run
 
@@ -43,7 +43,9 @@ npm run dist:win      # NSIS installer + portable .exe
 npm run dist:linux    # AppImage + .deb
 ```
 
-Installers land in `dist/`. To publish a release for all three platforms, push a version tag and GitHub Actions builds and attaches them:
+Installers land in `dist/`. On a Mac with a "Developer ID Application" certificate in the keychain, `dist:mac` signs automatically; add `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID` to the environment and pass `-c.mac.notarize=true` to notarize as well.
+
+To publish a release for all three platforms, push a version tag and GitHub Actions builds, signs, notarizes and attaches them (secrets are listed in `.github/workflows/release.yml`):
 
 ```
 npm version 0.1.0
