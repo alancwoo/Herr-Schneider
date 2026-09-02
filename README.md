@@ -5,6 +5,13 @@
   </picture>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="build/icon-dark.svg" />
+    <img src="build/icon-light.svg" width="160" height="160" alt="Herr Schneider app icon" />
+  </picture>
+</p>
+
 <h1 align="center">Herr Schneider</h1>
 
 <p align="center">All-in-one video downloader and clipper for macOS, Windows and Linux.<br />
