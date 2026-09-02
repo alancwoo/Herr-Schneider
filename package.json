@@ -1,0 +1,32 @@
+{
+  "name": "herunterladschneidausgeber",
+  "version": "0.1.0",
+  "description": "Cross-platform video trimmer. Open a file or paste a link, drag the handles, export.",
+  "main": "src/main.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "optionalDependencies": {
+    "ffmpeg-static": "latest",
+    "ffprobe-static": "latest"
+  },
+  "build": {
+    "appId": "ca.alanwoo.herunterladschneidausgeber",
+    "productName": "Herr Schneider",
+    "files": ["src/**/*", "package.json"],
+    "asarUnpack": ["node_modules/ffmpeg-static/**", "node_modules/ffprobe-static/**"],
+    "mac": { "category": "public.app-category.video", "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }] },
+    "win": { "target": ["nsis", "portable"] },
+    "linux": { "target": ["AppImage", "deb"], "category": "AudioVideo" }
+  }
+}

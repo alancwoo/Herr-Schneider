@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src clip: 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: clip:;" />
+<title>Herr Schneider</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header id="topbar">
+  <button id="btn-open" class="btn" title="Open a video file (Ctrl/Cmd+O)">Open file</button>
+  <form id="url-form" autocomplete="off">
+    <input id="url-input" type="text" placeholder="Paste a YouTube / any video link and press Enter (Ctrl/Cmd+L)" spellcheck="false" />
+    <button id="btn-fetch" class="btn primary" type="submit">Fetch</button>
+  </form>
+  <button id="btn-library" class="btn" title="Fetched videos (Ctrl/Cmd+B)">Library</button>
+  <button id="btn-help" class="btn ghost icon" title="Keyboard shortcuts (?)">?</button>
+</header>
+
+<main id="stage">
+  <video id="video" preload="auto" playsinline></video>
+  <div id="empty" class="overlay">
+    <div class="empty-card">
+      <div class="big">Drop a video here</div>
+      <div class="dim">or open a file, or paste a link above</div>
+      <div class="rule"></div>
+      <div id="wordmark" aria-label="Herr Schneider"></div>
+      <div id="tool-warning" class="warn" hidden></div>
+    </div>
+  </div>
+  <div id="busy" class="overlay" hidden>
+    <div class="busy-card">
+      <div id="busy-title">Working…</div>
+      <div class="bar"><div id="busy-bar" class="fill"></div></div>
+      <div id="busy-detail" class="dim"></div>
+      <button id="busy-cancel" class="btn">Cancel</button>
+    </div>
+  </div>
+</main>
+
+<section id="controls" hidden>
+  <div class="row transport">
+    <button id="btn-play" class="btn icon" title="Play / pause (Space)">
+      <svg id="icon-play" width="12" height="12" viewBox="0 0 12 12"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>
+      <svg id="icon-pause" width="12" height="12" viewBox="0 0 12 12" hidden><path d="M2 1h3v10H2zM7 1h3v10H7z" fill="currentColor"/></svg>
+    </button>
+    <button id="btn-preview" class="btn" title="Preview the trimmed clip (P)">Preview clip</button>
+    <button id="btn-mute" class="btn icon" title="Mute / unmute (M). When unmuted you also hear audio while scrubbing.">
+      <svg id="icon-sound" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+      <svg id="icon-muted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+    </button>
+    <button id="btn-set-in" class="btn" title="Set start at playhead (I or Ctrl+Space)">Set In</button>
+    <button id="btn-set-out" class="btn" title="Set end at playhead (O or Alt+Space)">Set Out</button>
+    <div class="times">
+      <span class="tg" title="Playhead position and frame number"><span class="k">Playhead <span id="t-frame"></span></span><b id="t-cur">0:00.000</b></span>
+      <span class="tg"><span class="k">In</span><span id="t-in">0:00.000</span></span>
+      <span class="tg"><span class="k">Out</span><span id="t-out">0:00.000</span></span>
+      <span class="tg"><span class="k">Clip</span><span id="t-len">0:00.000</span></span>
+    </div>
+  </div>
+
+  <div id="timeline">
+    <div id="ruler"></div>
+    <div id="track">
+      <canvas id="strip"></canvas>
+      <div id="selection"></div>
+      <div id="handle-in" class="handle" title="Drag to set start"></div>
+      <div id="handle-out" class="handle" title="Drag to set end"></div>
+      <div id="playhead"></div>
+      <div id="hoverline" hidden></div>
+    </div>
+    <div id="hover-preview" hidden>
+      <canvas id="hover-canvas"></canvas>
+      <div id="hover-time"></div>
+    </div>
+    <div id="nav-row">
+      <div id="nav" title="Whole video. Drag to choose a portion to zoom to; drag the window to pan.">
+        <div id="nav-sel"></div>
+        <div id="nav-view"></div>
+        <div id="nav-playhead"></div>
+      </div>
+      <button id="btn-zoom-out" class="btn icon zoom" title="Zoom out">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><line x1="16" y1="16" x2="21" y2="21"/><line x1="7.5" y1="10.5" x2="13.5" y2="10.5"/></svg>
+      </button>
+      <button id="btn-zoom-in" class="btn icon zoom" title="Zoom in">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><line x1="16" y1="16" x2="21" y2="21"/><line x1="7.5" y1="10.5" x2="13.5" y2="10.5"/><line x1="10.5" y1="7.5" x2="10.5" y2="13.5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="row export">
+    <div class="field" title="Output container">
+      <span class="flabel">Export Format</span>
+      <select id="format">
+        <option value="mp4">MP4 video</option>
+        <option value="gif">Animated GIF</option>
+      </select>
+    </div>
+    <div class="field" id="mode-field" title="Fast copies the original streams without re-encoding (start snaps to a keyframe). Precise re-encodes and is frame-accurate.">
+      <span class="flabel">Mode</span>
+      <select id="mode">
+        <option value="encode">Precise</option>
+        <option value="copy">Fast (no re-encode)</option>
+      </select>
+    </div>
+    <div class="field" id="quality-field" title="Caps the resolution (shorter edge)">
+      <span class="flabel">Quality</span>
+      <select id="quality">
+        <option value="original">Original</option>
+        <option value="1080">1080p</option>
+        <option value="720">720p</option>
+      </select>
+    </div>
+    <div class="field" id="size-field" title="Scale the output down to shrink the file">
+      <span class="flabel">Size</span>
+      <select id="size">
+        <option value="100">100%</option>
+        <option value="50">50%</option>
+        <option value="25">25%</option>
+      </select>
+    </div>
+    <div class="field" id="fps-field" title="GIF frame rate" hidden>
+      <span class="flabel">FPS</span>
+      <select id="fps">
+        <option value="10">10</option>
+        <option value="15" selected>15</option>
+        <option value="20">20</option>
+        <option value="30">30</option>
+      </select>
+    </div>
+    <div class="field" id="audio-field" title="Include the audio track">
+      <span class="flabel">Audio</span>
+      <button id="audio" class="btn icon toggle" aria-pressed="true">
+        <svg id="icon-audio-on" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+        <svg id="icon-audio-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+      </button>
+    </div>
+    <div class="field push">
+      <span class="flabel">&nbsp;</span>
+      <button id="btn-export" class="btn primary" title="Export clip (Ctrl/Cmd+S)">Export clip…</button>
+    </div>
+  </div>
+
+  <div id="summary">
+    <div class="half src"><span id="src-desc"></span><span class="line"></span></div>
+    <div class="half out"><span class="line"></span><svg class="arrow-head" width="8" height="10" viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0l8 5-8 5z" fill="currentColor"/></svg><span id="out-desc"></span></div>
+  </div>
+</section>
+
+<video id="thumb-video" muted preload="auto" class="offscreen"></video>
+<video id="hover-video" muted preload="auto" class="offscreen"></video>
+
+<div id="toasts"></div>
+
+<div id="library" class="overlay" hidden>
+  <div class="library-card">
+    <div class="library-head">
+      <h2>Library</h2>
+      <span id="library-stats" class="dim"></span>
+      <div class="spacer"></div>
+      <button id="library-folder" class="btn" title="Open the folder where fetched videos are stored">Open folder</button>
+      <button id="library-clear" class="btn danger" title="Delete every fetched video">Clear all</button>
+      <button id="library-close" class="btn ghost icon" title="Close">✕</button>
+    </div>
+    <div id="library-list"></div>
+    <div id="library-empty" class="dim" hidden>Nothing fetched yet. Paste a link in the top bar and it will be kept here so you can clip it again without downloading.</div>
+    <div id="library-path" class="dim small"></div>
+  </div>
+</div>
+
+<div id="help" class="overlay" hidden>
+  <div class="help-card">
+    <h2>Keyboard shortcuts</h2>
+    <table>
+      <tr><td>Space</td><td>Play / pause</td></tr>
+      <tr><td>P</td><td>Preview trimmed clip</td></tr>
+      <tr><td>M</td><td>Mute / unmute (unmuted = audible scrubbing)</td></tr>
+      <tr><td>← / →</td><td>Step one frame</td></tr>
+      <tr><td>Shift + ← / →</td><td>Move playhead 1 s</td></tr>
+      <tr><td>Alt + ← / →</td><td>Move playhead 5 s</td></tr>
+      <tr><td>, / .</td><td>Step one frame (Shift: 10 frames)</td></tr>
+      <tr><td>I &nbsp;or&nbsp; Ctrl + Space</td><td>Set trim start at playhead</td></tr>
+      <tr><td>O &nbsp;or&nbsp; Alt + Space</td><td>Set trim end at playhead</td></tr>
+      <tr><td>[ / ]</td><td>Jump to start / end of selection</td></tr>
+      <tr><td>Home / End</td><td>Jump to start / end of video</td></tr>
+      <tr><td>Z / Shift + Z</td><td>Zoom into selection / reset zoom</td></tr>
+      <tr><td>Drag on filmstrip</td><td>Select a range (click to seek)</td></tr>
+      <tr><td>Drag on overview bar</td><td>Choose the zoomed portion (drag the window to pan)</td></tr>
+      <tr><td>Wheel on timeline</td><td>Zoom (Shift + wheel pans)</td></tr>
+      <tr><td>Ctrl/Cmd + O</td><td>Open file</td></tr>
+      <tr><td>Ctrl/Cmd + L</td><td>Open link</td></tr>
+      <tr><td>Ctrl/Cmd + B</td><td>Library of fetched videos</td></tr>
+      <tr><td>Ctrl/Cmd + S</td><td>Export clip</td></tr>
+      <tr><td>Q</td><td>Quit</td></tr>
+      <tr><td>?</td><td>Show this help</td></tr>
+    </table>
+    <button id="help-close" class="btn">Close</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
