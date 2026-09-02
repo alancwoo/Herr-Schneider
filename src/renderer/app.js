@@ -53,8 +53,11 @@ const snapFrame = (t) => frameOf(t) / fpsOf();
   const spans = [...full].map((c, i) => { const sp = document.createElement('span'); sp.className = 'ch'; sp.textContent = c; sp.dataset.i = i; el.appendChild(sp); return sp; });
   setTimeout(() => {
     for (const sp of spans) if (!keep.has(Number(sp.dataset.i))) sp.classList.add('drop');
-    const sIdx = spans[11];
-    setTimeout(() => { sIdx.textContent = 'S'; sIdx.classList.add('space'); }, 700);
+    // The 'd' before 'schneid' fades out but keeps a word-space of width, so the gap in
+    // "Herr Schneider" forms as part of the same collapse rather than animating afterwards.
+    spans[10].classList.add('gap');
+    // Swap s → S while everything is still moving, so the change is barely noticeable.
+    setTimeout(() => { spans[11].textContent = 'S'; }, 350);
   }, 1400);
 })();
 
