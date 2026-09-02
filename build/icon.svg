@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- Herr Schneider: outline of an Alpine hat with a feather; below it a face whose eyes
-       are the finger rings of a pair of scissors, the blades its nose, and a handlebar moustache. -->
+  <!-- Herr Schneider: outline of an Alpine hat with a feather; below it a face with dot eyes,
+       a small pair of scissors for a nose, and a simple moustache. -->
   <rect x="100" y="100" width="824" height="824" rx="186" fill="#141414"/>
   <g fill="#141414" stroke="#f2f2f2" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
     <!-- brim -->
@@ -13,18 +13,17 @@
     <path d="M372 462 C 320 420, 236 330, 232 236 C 300 280, 362 380, 372 462 Z"/>
     <path d="M372 462 C 330 400, 280 320, 246 254" fill="none" stroke-width="12"/>
     <path d="M292 340 L312 318 M318 380 L340 356 M344 418 L364 396" fill="none" stroke-width="12"/>
-    <!-- eyes: scissor rings -->
-    <circle cx="428" cy="646" r="48"/>
-    <circle cx="596" cy="646" r="48"/>
-    <circle cx="428" cy="646" r="14" fill="#f2f2f2" stroke="none"/>
-    <circle cx="596" cy="646" r="14" fill="#f2f2f2" stroke="none"/>
-    <!-- handle arms to the pivot -->
-    <path d="M462 680 L500 716 M562 680 L524 716" fill="none"/>
-    <!-- nose: closed blades -->
-    <path d="M496 716 L486 828 L512 842 L538 828 L528 716 Z"/>
-    <path d="M512 720 L512 842" fill="none" stroke-width="12"/>
-    <circle cx="512" cy="716" r="16" fill="#f2f2f2" stroke="none"/>
-    <!-- moustache: one bushy handlebar, thick at the centre, curling up at the tips -->
-    <path d="M512 838 C 566 838, 630 826, 690 806 C 736 790, 770 768, 758 740 C 748 718, 722 724, 724 748 C 726 774, 700 792, 668 798 C 610 810, 570 896, 512 896 C 454 896, 414 810, 356 798 C 324 792, 298 774, 300 748 C 302 724, 276 718, 266 740 C 254 768, 288 790, 334 806 C 394 826, 458 838, 512 838 Z"/>
+    <!-- eyes -->
+    <circle cx="416" cy="628" r="17" fill="#f2f2f2" stroke="none"/>
+    <circle cx="608" cy="628" r="17" fill="#f2f2f2" stroke="none"/>
+    <!-- nose: a small pair of scissors pointing down, rings up, blades closed -->
+    <circle cx="484" cy="646" r="26"/>
+    <circle cx="540" cy="646" r="26"/>
+    <path d="M494 670 L506 700 M530 670 L518 700" fill="none" stroke-width="14"/>
+    <path d="M498 700 L490 796 L512 808 L534 796 L526 700 Z"/>
+    <path d="M512 704 L512 808" fill="none" stroke-width="10"/>
+    <circle cx="512" cy="700" r="12" fill="#f2f2f2" stroke="none"/>
+    <!-- moustache: simple, thick, gently upturned -->
+    <path d="M512 852 C 556 826, 626 816, 694 804 C 730 798, 748 816, 730 834 C 690 866, 598 878, 512 878 C 426 878, 334 866, 294 834 C 276 816, 294 798, 330 804 C 398 816, 468 826, 512 852 Z"/>
   </g>
 </svg>
