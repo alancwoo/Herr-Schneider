@@ -1,0 +1,38 @@
+# Builds installers for macOS, Windows and Linux and attaches them to a GitHub Release.
+# Trigger: push a tag like v0.1.0  (git tag v0.1.0 && git push origin v0.1.0)
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: --mac --arm64 --x64
+          - os: windows-latest
+            args: --win
+          - os: ubuntu-latest
+            args: --linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build and publish
+        run: npx electron-builder ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Unsigned macOS builds; set CSC_LINK / CSC_KEY_PASSWORD secrets to sign.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
