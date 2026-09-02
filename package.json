@@ -4,7 +4,7 @@
   "description": "Cross-platform video trimmer. Open a file or paste a link, drag the handles, export.",
   "repository": "github:alancwoo/Herr-Schneider",
   "main": "src/main.js",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",

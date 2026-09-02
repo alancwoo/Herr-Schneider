@@ -76,4 +76,8 @@ The full name is *Herunterladschneidausgeber*: download-cut-exporter. Strike out
 
 Fetched videos live in the app data folder (`~/Library/Application Support/herunterladschneidausgeber/sources` on macOS, `%APPDATA%\herunterladschneidausgeber\sources` on Windows, `~/.config/herunterladschneidausgeber/sources` on Linux).
 
-MIT. Built on Electron, ffmpeg and yt-dlp.
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE). Free to use, modify and share for any noncommercial purpose, including personal use, education, research and nonprofits. Commercial use needs a separate licence from the author.
+
+Built on Electron, ffmpeg and yt-dlp, which keep their own licences.
