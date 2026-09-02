@@ -1,30 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- Herr Schneider: an Alpine hat with scissors in the band where the feather would go. -->
+  <!-- Herr Schneider: outline of an Alpine hat with a feather; below it a face whose eyes
+       are the finger rings of a pair of scissors, the blades its nose, and a handlebar moustache. -->
   <rect x="100" y="100" width="824" height="824" rx="186" fill="#141414"/>
-
-  <!-- brim, back half -->
-  <ellipse cx="512" cy="716" rx="372" ry="54" fill="#d9d9d9"/>
-
-  <!-- crown: pinched Alpine shape with a centre dent -->
-  <path d="M302 716 L336 338 Q350 292 410 296 Q470 302 512 366 Q554 302 614 296 Q674 292 688 338 L722 716 Z" fill="#ececec"/>
-  <path d="M512 366 L508 470" stroke="#bdbdbd" stroke-width="10" stroke-linecap="round" fill="none"/>
-
-  <!-- scissors: in front of the crown; the blades are short and end inside the band -->
-  <g transform="translate(412 604) rotate(-34)" fill="#f2f2f2" stroke="#141414" stroke-width="13" stroke-linejoin="round">
-    <path d="M-20 0 L-36 62 L-2 62 L22 0 Z" transform="rotate(-4)"/>
-    <path d="M-22 0 L2 62 L36 62 L20 0 Z" transform="rotate(4)"/>
-    <path d="M-13 0 L-84 -128 L-50 -148 L13 0 Z"/>
-    <path d="M13 0 L84 -128 L50 -148 L-13 0 Z"/>
-    <path fill-rule="evenodd" d="M-78 -204 m-62 0 a62 62 0 1 0 124 0 a62 62 0 1 0 -124 0 M-78 -204 m-30 0 a30 30 0 1 1 60 0 a30 30 0 1 1 -60 0"/>
-    <path fill-rule="evenodd" d="M78 -204 m-62 0 a62 62 0 1 0 124 0 a62 62 0 1 0 -124 0 M78 -204 m-30 0 a30 30 0 1 1 60 0 a30 30 0 1 1 -60 0"/>
-    <circle cx="0" cy="0" r="16" fill="#141414" stroke="none"/>
+  <g fill="#141414" stroke="#f2f2f2" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <!-- brim -->
+    <path d="M160 522 Q512 448 864 522 Q512 596 160 522 Z"/>
+    <!-- crown -->
+    <path d="M330 522 L356 250 Q368 208 420 212 Q470 218 512 272 Q554 218 604 212 Q656 208 668 250 L694 522 Z"/>
+    <!-- band -->
+    <path d="M338 436 L686 436 M335 474 L689 474" fill="none"/>
+    <!-- feather -->
+    <path d="M372 462 C 320 420, 236 330, 232 236 C 300 280, 362 380, 372 462 Z"/>
+    <path d="M372 462 C 330 400, 280 320, 246 254" fill="none" stroke-width="12"/>
+    <path d="M292 340 L312 318 M318 380 L340 356 M344 418 L364 396" fill="none" stroke-width="12"/>
+    <!-- eyes: scissor rings -->
+    <circle cx="428" cy="646" r="48"/>
+    <circle cx="596" cy="646" r="48"/>
+    <circle cx="428" cy="646" r="14" fill="#f2f2f2" stroke="none"/>
+    <circle cx="596" cy="646" r="14" fill="#f2f2f2" stroke="none"/>
+    <!-- handle arms to the pivot -->
+    <path d="M462 680 L500 716 M562 680 L524 716" fill="none"/>
+    <!-- nose: closed blades -->
+    <path d="M496 716 L486 828 L512 842 L538 828 L528 716 Z"/>
+    <path d="M512 720 L512 842" fill="none" stroke-width="12"/>
+    <circle cx="512" cy="716" r="16" fill="#f2f2f2" stroke="none"/>
+    <!-- moustache: one bushy handlebar, thick at the centre, curling up at the tips -->
+    <path d="M512 838 C 566 838, 630 826, 690 806 C 736 790, 770 768, 758 740 C 748 718, 722 724, 724 748 C 726 774, 700 792, 668 798 C 610 810, 570 896, 512 896 C 454 896, 414 810, 356 798 C 324 792, 298 774, 300 748 C 302 724, 276 718, 266 740 C 254 768, 288 790, 334 806 C 394 826, 458 838, 512 838 Z"/>
   </g>
-
-  <!-- band with cord: covers the blades -->
-  <path d="M320 596 L306 684 L718 684 L704 596 Z" fill="#141414"/>
-  <path d="M316 626 L708 626 M312 652 L712 652" stroke="#5a5a5a" stroke-width="5" fill="none"/>
-
-  <!-- brim, front half -->
-  <path d="M140 716 Q512 640 884 716 Q512 780 140 716 Z" fill="#f2f2f2"/>
-  <path d="M140 716 Q512 640 884 716" stroke="#c9c9c9" stroke-width="8" fill="none"/>
 </svg>
