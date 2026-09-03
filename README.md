@@ -28,33 +28,7 @@ Paste a link or drop a file. Mark in and out. Export.</p>
 
 Installers for macOS, Windows and Linux are on the [Releases](https://github.com/alancwoo/Herr-Schneider/releases) page. The macOS build is signed and notarized.
 
-## Run
-
-```
-npm install
-npm start
-npm start -- path/to/video.mp4
-npm start -- "https://youtu.be/…"
-```
-
-ffmpeg and ffprobe are bundled. yt-dlp is used from your PATH if present, otherwise downloaded automatically on first fetch. Override any of them with `CLIPPERRR_FFMPEG`, `CLIPPERRR_FFPROBE`, `CLIPPERRR_YTDLP`.
-
-## Build
-
-```
-npm run dist:mac      # .dmg, arm64 + x64
-npm run dist:win      # NSIS installer + portable .exe
-npm run dist:linux    # AppImage + .deb
-```
-
-Installers land in `dist/`. On a Mac with a "Developer ID Application" certificate in the keychain, `dist:mac` signs automatically; add `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID` to the environment and pass `-c.mac.notarize=true` to notarize as well.
-
-To publish a release for all three platforms, push a version tag and GitHub Actions builds, signs, notarizes and attaches them (secrets are listed in `.github/workflows/release.yml`):
-
-```
-npm version 0.1.0
-git push origin main --tags
-```
+ffmpeg is bundled. yt-dlp is used from your PATH if you have it, otherwise it's downloaded automatically the first time you fetch a link.
 
 ## Keyboard
 
@@ -73,6 +47,36 @@ git push origin main --tags
 | Ctrl/Cmd+B | Library |
 | Ctrl/Cmd+S | Export |
 | ? | All shortcuts |
+
+## Development
+
+Run from source:
+
+```
+npm install
+npm start
+npm start -- path/to/video.mp4
+npm start -- "https://youtu.be/…"
+```
+
+Override the bundled tools with `CLIPPERRR_FFMPEG`, `CLIPPERRR_FFPROBE`, `CLIPPERRR_YTDLP`.
+
+Build installers locally:
+
+```
+npm run dist:mac      # .dmg, arm64 + x64
+npm run dist:win      # NSIS installer + portable .exe
+npm run dist:linux    # AppImage + .deb
+```
+
+Installers land in `dist/`. On a Mac with a "Developer ID Application" certificate in the keychain, `dist:mac` signs automatically; add `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID` to the environment and pass `-c.mac.notarize=true` to notarize as well.
+
+Publish a release for all three platforms by pushing a version tag. GitHub Actions builds, signs, notarizes and attaches the installers (secrets are listed in `.github/workflows/release.yml`):
+
+```
+npm version 0.1.0
+git push origin main --tags
+```
 
 ## The name
 
