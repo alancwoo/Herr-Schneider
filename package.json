@@ -1,6 +1,6 @@
 {
   "name": "herunterladschneidausgeber",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cross-platform video trimmer. Open a file or paste a link, drag the handles, export.",
   "repository": "github:alancwoo/Herr-Schneider",
   "author": {
