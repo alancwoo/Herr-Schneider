@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Cross-platform video trimmer. Open a file or paste a link, drag the handles, export.",
   "repository": "github:alancwoo/Herr-Schneider",
+  "author": {
+    "name": "Alan Woo",
+    "email": "git@alanwoo.ca"
+  },
   "main": "src/main.js",
   "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
@@ -54,8 +58,7 @@
       "target": [
         "nsis",
         "portable"
-      ],
-      "artifactName": "Herr-Schneider-${version}-win-${arch}.${ext}"
+      ]
     },
     "linux": {
       "target": [
@@ -63,11 +66,20 @@
         "deb"
       ],
       "category": "AudioVideo",
-      "artifactName": "Herr-Schneider-${version}-linux-${arch}.${ext}"
+      "artifactName": "Herr-Schneider-${version}-linux-${arch}.${ext}",
+      "maintainer": "Alan Woo <git@alanwoo.ca>"
     },
     "publish": {
       "provider": "github",
       "releaseType": "release"
+    },
+    "nsis": {
+      "artifactName": "Herr-Schneider-${version}-win-${arch}-setup.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "portable": {
+      "artifactName": "Herr-Schneider-${version}-win-${arch}-portable.${ext}"
     }
   }
 }
