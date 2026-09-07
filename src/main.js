@@ -6,6 +6,7 @@ const { Readable } = require('stream');
 const { resolveTools, installYtDlp } = require('./tools');
 const media = require('./media');
 const { Library, buildItem } = require('./library');
+const transcript = require('./transcript');
 
 const isMac = process.platform === 'darwin';
 const isDev = process.argv.includes('--dev');
@@ -90,7 +91,14 @@ function buildMenu() {
       ],
     },
     { role: 'editMenu' },
-    { label: 'View', submenu: [{ role: 'togglefullscreen' }, { role: 'toggleDevTools' }] },
+    {
+      label: 'View',
+      submenu: [
+        { label: 'Find in Transcript…', accelerator: 'CmdOrCtrl+F', click: send('transcript') },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }, { role: 'toggleDevTools' },
+      ],
+    },
     { role: 'windowMenu' },
     { label: 'Help', submenu: [{ label: 'Keyboard Shortcuts', click: send('help') }] },
   ];
@@ -228,10 +236,78 @@ ipcMain.handle('media:download', async (_e, { url, jobId, force }) => {
   catch (e) { fs.rmSync(dir, { recursive: true, force: true }); throw e; }
   progress(jobId, { stage: 'index', percent: 1 });
   const info = await media.probe(t, file);
+  await topUpSubtitles(t, url, dir, jobId);
   const item = library.add(buildItem({ url, dir, file, info }));
   library.touch(item.id);
   progress(jobId, { done: true });
   return { file, item, cached: false };
+});
+
+// The first pass grabs English and original-language auto captions. If the page
+// also has human-made subtitles in its own language that we skipped, fetch those.
+async function topUpSubtitles(t, url, dir, jobId) {
+  const meta = transcript.readMeta(dir);
+  if (!meta || !meta.subtitles) return;
+  const manual = Object.keys(meta.subtitles).filter((l) => l !== 'live_chat');
+  if (!manual.length) return;
+  if (transcript.scanDir(dir, null, meta).some((x) => x.manual)) return;
+  const want = manual.includes(meta.language) ? meta.language : manual[0];
+  progress(jobId, { stage: 'subs', percent: 1 });
+  const job = transcript.fetchSubs(media.run, t, url, dir, want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  try { await track(jobId, job); } catch (e) { if (e.cancelled) throw e; }
+}
+
+// ---- transcript ----
+function libraryItemFor(file) { return library.items.find((it) => it.file === file) || null; }
+
+async function transcriptTracks(entry) {
+  const file = entry.info.path;
+  const item = libraryItemFor(file);
+  let tracks = [];
+  if (item && item.dir) tracks = transcript.scanDir(item.dir, null, transcript.readMeta(item.dir));
+  if (!tracks.length) tracks = transcript.scanDir(path.dirname(file), path.basename(file, path.extname(file)), null);
+  if (!tracks.length && entry.info.subs && entry.info.subs.length) {
+    const t = tools();
+    for (const s of entry.info.subs) {
+      try {
+        const vtt = await transcript.extractEmbedded(media.run, t, file, s.index, userDir('transcripts'), media.cacheKey(file));
+        const lang = s.lang || 'und';
+        tracks.push({ key: vtt, file: vtt, lang, auto: false, manual: false, label: s.title || transcript.langName(lang), source: 'embedded subtitles' });
+      } catch {}
+    }
+  }
+  const out = [];
+  const seen = new Set();
+  for (const tr of tracks) {
+    try {
+      const cues = transcript.parseFile(tr.file);
+      // Sites sometimes serve the same text under two language codes; keep the first.
+      const sig = cues.map((c) => c.text).join('\n');
+      if (cues.length && !seen.has(sig)) { seen.add(sig); out.push({ key: tr.key, label: tr.label, lang: tr.lang, source: tr.source, cues }); }
+    } catch {}
+  }
+  return { tracks: out, fetchable: !!(item && item.webpageUrl), title: item ? item.title : null };
+}
+
+ipcMain.handle('transcript:load', async (_e, id) => {
+  const entry = loaded.get(id);
+  if (!entry) throw new Error('Unknown media id');
+  return transcriptTracks(entry);
+});
+
+ipcMain.handle('transcript:fetch', async (_e, { id, jobId }) => {
+  const entry = loaded.get(id);
+  if (!entry) throw new Error('Unknown media id');
+  const item = libraryItemFor(entry.info.path);
+  if (!item || !item.dir) throw new Error('Only videos fetched from a link can look up a transcript.');
+  const t = tools();
+  if (!t.ytdlp) throw new Error('yt-dlp not found.');
+  await track(jobId, transcript.fetchSubs(media.run, t, item.webpageUrl || item.sourceUrl, item.dir));
+  await topUpSubtitles(t, item.webpageUrl || item.sourceUrl, item.dir, jobId);
+  item.subs = transcript.scanDir(item.dir, null, null).length;
+  library.save();
+  progress(jobId, { done: true });
+  return transcriptTracks(entry);
 });
 
 // ---- library ----

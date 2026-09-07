@@ -4,6 +4,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { SUB_ARGS, TEXT_SUB_CODECS } = require('./transcript');
 
 const PLAYABLE_CONTAINERS = ['mov', 'mp4', 'm4a', '3gp', '3g2', 'mj2', 'matroska', 'webm'];
 const PLAYABLE_VIDEO = ['h264', 'vp8', 'vp9', 'av1'];
@@ -63,6 +64,9 @@ async function probe(tools, file) {
   const data = JSON.parse(stdout);
   const v = (data.streams || []).find((s) => s.codec_type === 'video' && s.disposition?.attached_pic !== 1);
   const a = (data.streams || []).find((s) => s.codec_type === 'audio');
+  const subs = (data.streams || []).filter((s) => s.codec_type === 'subtitle')
+    .map((s, i) => ({ index: i, codec: s.codec_name, lang: s.tags?.language || null, title: s.tags?.title || null }))
+    .filter((s) => TEXT_SUB_CODECS.includes(s.codec));
   if (!v) throw new Error('No video stream found in this file.');
   const rot = rotationOf(v);
   const swap = rot === 90 || rot === 270;
@@ -88,6 +92,7 @@ async function probe(tools, file) {
     pixFmt: v.pix_fmt,
     container: containers[0],
     playable,
+    subs,
   };
 }
 
@@ -173,12 +178,14 @@ function exportClip(tools, { info, start, end, mode, quality, size, audio, forma
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|flv|ts|mpg|mpeg|3gp|ogv)$/i;
 
 // Fetch a URL with yt-dlp into dir (one folder per download), preferring a
-// browser-playable MP4. Also saves the page metadata (info.json) and thumbnail.
+// browser-playable MP4. Also saves the page metadata (info.json), thumbnail and
+// captions (English plus the original language) when the site offers them.
 function download(tools, url, dir, onProgress) {
   fs.mkdirSync(dir, { recursive: true });
   const args = [
     '--no-playlist', '--newline', '--progress', '--no-warnings',
     '--write-info-json', '--write-thumbnail', '--no-write-playlist-metafiles',
+    ...SUB_ARGS,
     '--ffmpeg-location', path.dirname(tools.ffmpeg),
     '-f', 'bv*[vcodec^=avc1][ext=mp4]+ba[ext=m4a]/bv*[ext=mp4]+ba/b[ext=mp4]/bv*+ba/b',
     '--merge-output-format', 'mp4',
@@ -207,4 +214,4 @@ function download(tools, url, dir, onProgress) {
   return { promise, cancel: job.cancel };
 }
 
-module.exports = { probe, makeProxy, exportClip, download, targetDims };
+module.exports = { run, probe, makeProxy, exportClip, download, targetDims, cacheKey };

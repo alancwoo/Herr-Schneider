@@ -23,6 +23,7 @@ Paste a link or drop a file. Mark in and out. Export.</p>
 - Drop in any file, or paste in a [yt-dlp](https://github.com/yt-dlp/yt-dlp)-compatible video link
 - Downloaded files remain in your library to clip or manage anytime
 - Easily re-encode, scale, or convert to animated GIF
+- Search the transcript and jump straight to a line, from the video's captions or its subtitle track
 
 ## Download
 
@@ -42,6 +43,7 @@ ffmpeg is bundled. yt-dlp is used from your PATH if you have it, otherwise it's 
 | I / O | Set in / out at the playhead |
 | [ ] | Jump to in / out |
 | Z / Shift+Z | Zoom to selection / reset |
+| T or Ctrl/Cmd+F | Find in transcript (Enter jumps to the next match) |
 | Ctrl/Cmd+O | Open file |
 | Ctrl/Cmd+L | Open link |
 | Ctrl/Cmd+B | Library |

@@ -17,6 +17,7 @@
   <button id="btn-help" class="btn ghost icon" title="Keyboard shortcuts (?)">?</button>
 </header>
 
+<div id="main">
 <main id="stage">
   <video id="video" preload="auto" playsinline></video>
   <div id="empty" class="overlay">
@@ -37,6 +38,22 @@
     </div>
   </div>
 </main>
+<aside id="transcript" hidden>
+  <div class="tr-head">
+    <input id="tr-search" type="text" placeholder="Search transcript" spellcheck="false" autocomplete="off" />
+    <button id="tr-close" class="btn ghost icon" title="Close (Esc)">✕</button>
+  </div>
+  <div class="tr-meta">
+    <select id="tr-lang" title="Caption track"></select>
+    <span id="tr-count" class="dim"></span>
+  </div>
+  <div id="tr-list"></div>
+  <div id="tr-empty" hidden>
+    <div id="tr-empty-text" class="dim"></div>
+    <button id="tr-fetch" class="btn" hidden>Look up transcript</button>
+  </div>
+</aside>
+</div>
 
 <section id="controls" hidden>
   <div class="row transport">
@@ -74,10 +91,12 @@
       <div id="hover-time"></div>
     </div>
     <div id="nav-row">
+      <button id="btn-transcript" class="btn navbtn" title="Search the transcript and jump to a line (Ctrl/Cmd+F)" hidden>Find in transcript</button>
       <div id="nav" title="Whole video. Drag to choose a portion to zoom to; drag the window to pan.">
         <div id="nav-sel"></div>
         <div id="nav-view"></div>
         <div id="nav-playhead"></div>
+        <div id="nav-marks"></div>
       </div>
       <button id="btn-zoom-out" class="btn icon zoom" title="Zoom out">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><line x1="16" y1="16" x2="21" y2="21"/><line x1="7.5" y1="10.5" x2="13.5" y2="10.5"/></svg>
@@ -184,6 +203,7 @@
       <tr><td>[ / ]</td><td>Jump to start / end of selection</td></tr>
       <tr><td>Home / End</td><td>Jump to start / end of video</td></tr>
       <tr><td>Z / Shift + Z</td><td>Zoom into selection / reset zoom</td></tr>
+      <tr><td>T &nbsp;or&nbsp; Ctrl/Cmd + F</td><td>Find in transcript (Enter jumps to the next match)</td></tr>
       <tr><td>Drag on filmstrip</td><td>Select a range (click to seek)</td></tr>
       <tr><td>Drag on overview bar</td><td>Choose the zoomed portion (drag the window to pan)</td></tr>
       <tr><td>Wheel on timeline</td><td>Zoom (Shift + wheel pans)</td></tr>

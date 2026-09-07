@@ -82,6 +82,7 @@ api.onProgress((p) => {
   if (p.stage === 'info') return busyProgress(null, 'Looking up video…');
   if (p.stage === 'merge') return busyProgress(1, 'Merging streams…');
   if (p.stage === 'index') return busyProgress(1, 'Adding to library…');
+  if (p.stage === 'subs') return busyProgress(1, 'Fetching transcript…');
   const bits = [];
   if (p.size) bits.push(p.size);
   if (p.speed) bits.push(p.speed);
@@ -100,6 +101,7 @@ async function loadFile(file) {
     $('empty').hidden = true; $('controls').hidden = false;
     document.title = `${info.name} — Herr Schneider`;
     updateExportUI();
+    loadTranscript();
     if (info.playable) {
       await attachSource(src, true);
     } else {
@@ -386,6 +388,7 @@ function renderPlayhead() {
   $('t-frame').textContent = state.info ? `Frame ${frameOf(video.currentTime)}` : '';
   $('playhead').style.left = `${xOf(video.currentTime)}px`;
   if (state.duration) $('nav-playhead').style.left = `${(video.currentTime / state.duration) * nav.clientWidth}px`;
+  transcriptFollow(video.currentTime);
 }
 function renderRuler() {
   const r = $('ruler'); r.innerHTML = '';
@@ -720,11 +723,197 @@ track.addEventListener('mouseleave', () => { if (!drag) hideHover(); });
 window.addEventListener('mousemove', (e) => { if (drag && state.id) showHover(e.clientX); });
 window.addEventListener('mouseup', () => setTimeout(() => { if (!track.matches(':hover')) hideHover(); }, 0));
 
+// ---------- transcript sidebar ----------
+const tr = { tracks: [], fetchable: false, cues: [], rows: [], active: -1, hits: [], hit: -1, query: '', loadedFor: null };
+const trList = $('tr-list');
+const trSearch = $('tr-search');
+const fold = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+async function loadTranscript() {
+  const id = state.id;
+  const wasOpen = !$('transcript').hidden;
+  tr.tracks = []; tr.fetchable = false; tr.loadedFor = id;
+  applyTranscript();
+  try {
+    const r = await api.transcript.load(id);
+    if (state.id !== id) return;
+    tr.tracks = r.tracks; tr.fetchable = r.fetchable; tr.loadedFor = id;
+  } catch { /* no transcript */ }
+  applyTranscript();
+  if (wasOpen && tr.tracks.length) openTranscript(false);
+}
+
+function applyTranscript() {
+  const btn = $('btn-transcript');
+  const available = tr.tracks.length > 0 || tr.fetchable;
+  btn.hidden = !state.id || !available;
+  if (!available && !$('transcript').hidden && state.id) closeTranscript();
+  const sel = $('tr-lang'); sel.innerHTML = '';
+  for (const [i, t] of tr.tracks.entries()) { const o = document.createElement('option'); o.value = String(i); o.textContent = t.label; sel.appendChild(o); }
+  sel.classList.toggle('single', tr.tracks.length <= 1);
+  sel.hidden = tr.tracks.length === 0;
+  $('tr-empty').hidden = tr.tracks.length > 0;
+  if (!tr.tracks.length) {
+    $('tr-empty-text').textContent = tr.fetchable ? 'No transcript was saved with this video. It can be looked up again from the source page.' : 'No transcript. Captions come with videos fetched from a link, from subtitle tracks inside the file, or from a .vtt / .srt file next to it.';
+    $('tr-fetch').hidden = !tr.fetchable;
+  }
+  selectTrack(tr.tracks.length ? 0 : -1);
+}
+
+function selectTrack(i) {
+  tr.cues = i >= 0 ? tr.tracks[i].cues : [];
+  tr.active = -1;
+  $('tr-lang').value = String(i);
+  trList.innerHTML = '';
+  tr.rows = tr.cues.map((c, idx) => {
+    const row = document.createElement('div'); row.className = 'cue'; row.dataset.i = String(idx);
+    const t = document.createElement('span'); t.className = 't'; t.textContent = fmtShort(c.start);
+    const x = document.createElement('span'); x.className = 'x'; x.textContent = c.text;
+    row.append(t, x);
+    row.title = `Jump to ${fmt(c.start)}`;
+    return row;
+  });
+  trList.append(...tr.rows);
+  searchTranscript(trSearch.value);
+  transcriptFollow(video.currentTime, true);
+}
+
+function searchTranscript(q) {
+  tr.query = q.trim();
+  tr.hits = []; tr.hit = -1;
+  const needle = fold(tr.query);
+  const re = tr.query ? new RegExp(escapeRe(tr.query).replace(/\s+/g, '\\s+'), 'ig') : null;
+  tr.rows.forEach((row, i) => {
+    const c = tr.cues[i];
+    const x = row.lastChild;
+    const match = !!needle && fold(c.text).includes(needle);
+    row.hidden = !!needle && !match;
+    row.classList.remove('hit');
+    if (match) {
+      tr.hits.push(i);
+      x.textContent = '';
+      let last = 0;
+      for (const m of c.text.matchAll(re)) {
+        x.append(c.text.slice(last, m.index));
+        const mk = document.createElement('mark'); mk.textContent = m[0]; x.appendChild(mk);
+        last = m.index + m[0].length;
+      }
+      x.append(c.text.slice(last));
+    } else if (x.childNodes.length !== 1 || x.firstChild.nodeType !== 3) {
+      x.textContent = c.text;
+    }
+  });
+  const n = tr.cues.length;
+  $('tr-count').textContent = !n ? '' : tr.query ? `${tr.hits.length} match${tr.hits.length === 1 ? '' : 'es'}` : `${n} line${n === 1 ? '' : 's'}`;
+  renderNavMarks();
+}
+
+function renderNavMarks() {
+  const box = $('nav-marks'); box.innerHTML = '';
+  const W = nav.clientWidth; if (!W || !state.duration || !tr.query) return;
+  const frag = document.createDocumentFragment();
+  for (const i of tr.hits.slice(0, 400)) { const m = document.createElement('div'); m.className = 'mark'; m.style.left = `${(tr.cues[i].start / state.duration) * W}px`; frag.appendChild(m); }
+  box.appendChild(frag);
+}
+
+// Enter cycles through matches (Shift+Enter backwards) and moves the playhead.
+function jumpHit(dir) {
+  if (!tr.hits.length) return;
+  tr.hit = (tr.hit + dir + tr.hits.length) % tr.hits.length;
+  const i = tr.hits[tr.hit];
+  tr.rows.forEach((r) => r.classList.remove('hit'));
+  tr.rows[i].classList.add('hit');
+  $('tr-count').textContent = `${tr.hit + 1} of ${tr.hits.length}`;
+  gotoCue(i);
+}
+
+function gotoCue(i) {
+  const c = tr.cues[i]; if (!c) return;
+  seek(c.start + 0.0005);
+  setActiveCue(i, true);
+  renderPlayhead();
+}
+
+function setActiveCue(i, scroll) {
+  if (i === tr.active) return;
+  if (tr.rows[tr.active]) tr.rows[tr.active].classList.remove('active');
+  tr.active = i;
+  const row = tr.rows[i];
+  if (!row) return;
+  row.classList.add('active');
+  if (scroll && !row.hidden) row.scrollIntoView({ block: 'nearest' });
+}
+
+// Highlight the cue under the playhead; scroll to it unless the user is reading/searching.
+function transcriptFollow(t, force) {
+  if ($('transcript').hidden || !tr.cues.length) return;
+  let lo = 0, hi = tr.cues.length - 1, i = -1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (tr.cues[mid].start <= t) { i = mid; lo = mid + 1; } else hi = mid - 1; }
+  if (i >= 0 && t > tr.cues[i].end + 1.5 && i < tr.cues.length - 1) i = -1;
+  setActiveCue(i, force || (!tr.query && !trList.matches(':hover')));
+}
+
+function openTranscript(focus) {
+  if ($('btn-transcript').hidden) return;
+  const was = $('transcript').hidden;
+  $('transcript').hidden = false;
+  $('btn-transcript').classList.add('on');
+  if (was) { transcriptFollow(video.currentTime, true); }
+  if (focus) { trSearch.focus(); trSearch.select(); }
+}
+function closeTranscript() {
+  $('transcript').hidden = true;
+  $('btn-transcript').classList.remove('on');
+}
+function toggleTranscript() { if ($('transcript').hidden) openTranscript(true); else closeTranscript(); }
+
+async function fetchTranscript() {
+  if (!state.id || state.activeJob) return;
+  const id = state.id;
+  const jobId = newJobId('subs');
+  busy('Looking up transcript…', { cancellable: true, indeterminate: true });
+  state.activeJob = jobId;
+  try {
+    const r = await api.transcript.fetch(id, jobId);
+    unbusy();
+    if (state.id !== id) return;
+    tr.tracks = r.tracks; tr.fetchable = r.fetchable;
+    applyTranscript();
+    if (!r.tracks.length) toast('The source page has no captions for this video.', 'err');
+  } catch (e) {
+    unbusy();
+    if (!e.message?.includes('Cancelled')) toast(e.message, 'err');
+  }
+}
+
+$('btn-transcript').onclick = toggleTranscript;
+$('tr-close').onclick = closeTranscript;
+$('tr-fetch').onclick = fetchTranscript;
+$('tr-lang').onchange = (e) => selectTrack(Number(e.target.value));
+trSearch.addEventListener('input', () => searchTranscript(trSearch.value));
+trSearch.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') jumpHit(e.shiftKey ? -1 : 1);
+  else if (e.key === 'Escape') { if (trSearch.value) { trSearch.value = ''; searchTranscript(''); } else closeTranscript(); }
+  else if (e.key === 'ArrowDown') jumpHit(1);
+  else if (e.key === 'ArrowUp') jumpHit(-1);
+  else return;
+  e.preventDefault(); e.stopPropagation();
+});
+trList.addEventListener('click', (e) => {
+  const row = e.target.closest('.cue'); if (!row) return;
+  const i = Number(row.dataset.i);
+  if (tr.query) { tr.hit = tr.hits.indexOf(i); tr.rows.forEach((r) => r.classList.remove('hit')); row.classList.add('hit'); }
+  gotoCue(i);
+});
+new ResizeObserver(renderNavMarks).observe(nav);
+
 // ---------- keyboard ----------
 window.addEventListener('keydown', (e) => {
   const inInput = e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA';
   const mod = e.metaKey || e.ctrlKey;
-  if (e.key === 'Escape') { if (!$('help').hidden) $('help').hidden = true; else if (!$('library').hidden) $('library').hidden = true; else if (inInput) e.target.blur(); else zoomReset(); return; }
+  if (e.key === 'Escape') { if (!$('help').hidden) $('help').hidden = true; else if (!$('library').hidden) $('library').hidden = true; else if (inInput) e.target.blur(); else if (!$('transcript').hidden) closeTranscript(); else zoomReset(); return; }
+  if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); return openTranscript(true); }
   if (mod && e.key.toLowerCase() === 'b') { e.preventDefault(); return $('library').hidden ? openLibrary() : ($('library').hidden = true); }
   if (mod && e.key.toLowerCase() === 'o') { e.preventDefault(); return openFile(); }
   if (mod && e.key.toLowerCase() === 'l') { e.preventDefault(); return $('url-input').focus(); }
@@ -753,6 +942,7 @@ window.addEventListener('keydown', (e) => {
     case 'Home': seek(0); break;
     case 'End': seek(state.duration); break;
     case 'KeyZ': if (e.shiftKey) zoomReset(); else zoomSelection(); break;
+    case 'KeyT': toggleTranscript(); break;
     default: return;
   }
   renderPlayhead();
@@ -795,6 +985,7 @@ api.onOpen((t) => {
   else if (t.command === 'export') doExport();
   else if (t.command === 'help') $('help').hidden = false;
   else if (t.command === 'library') openLibrary();
+  else if (t.command === 'transcript') openTranscript(true);
 });
 
 refreshTools();

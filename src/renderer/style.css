@@ -97,7 +97,8 @@ body.mac #topbar { padding-left: 84px; }
 .btn.primary:disabled:hover { background: var(--ink); color: var(--ink-fg); }
 
 /* ---- stage ---- */
-#stage { position: relative; flex: 1; min-height: 0; background: var(--stage); display: flex; align-items: center; justify-content: center; }
+#main { display: flex; flex: 1; min-height: 0; }
+#stage { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--stage); display: flex; align-items: center; justify-content: center; }
 #video { width: 100%; height: 100%; object-fit: contain; outline: none; }
 .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--scrim); z-index: 20; }
 #empty { background: var(--bg); }
@@ -185,6 +186,11 @@ select:disabled { opacity: 0.5; }
 #nav-view.full { border-color: transparent; pointer-events: none; }
 #nav-view:active { cursor: grabbing; }
 #nav-playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink); pointer-events: none; }
+#nav-marks { position: absolute; inset: 0; pointer-events: none; }
+#nav-marks .mark { position: absolute; bottom: 0; width: 2px; height: 5px; margin-left: -1px; background: var(--ink); }
+.btn.navbtn { height: 24px; padding: 0 9px; font-size: 9.5px; border-color: var(--line); }
+.btn.navbtn:hover { border-color: var(--rule); }
+.btn.navbtn.on { background: var(--ink); color: var(--ink-fg); border-color: var(--ink); }
 .btn.icon.zoom { width: 24px; height: 24px; border-color: var(--line); }
 .btn.icon.zoom:hover { border-color: var(--rule); }
 #selection { position: absolute; top: 0; bottom: 0; pointer-events: none; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); }
@@ -192,6 +198,28 @@ select:disabled { opacity: 0.5; }
 .handle::after { content: ""; position: absolute; left: 4px; top: 20px; bottom: 20px; width: 2px; background: var(--ink-fg); opacity: 0.7; }
 #playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink); z-index: 3; pointer-events: none; }
 #playhead::before { content: ""; position: absolute; top: 0; left: -5px; border: 5px solid transparent; border-top: 7px solid var(--ink); border-bottom: 0; }
+
+/* ---- transcript sidebar ---- */
+#transcript { width: 340px; flex: none; display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--rule); min-height: 0; }
+@media (max-width: 980px) { #transcript { width: 280px; } }
+.tr-head { display: flex; gap: 0; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+#tr-search { flex: 1; min-width: 0; height: 28px; background: var(--bg); color: var(--text); border: 1px solid var(--rule); border-right: 0; padding: 0 9px; font: inherit; font-size: 12.5px; outline: none; border-radius: 0; }
+#tr-search::placeholder { color: var(--dim); }
+#tr-search:focus { box-shadow: inset 0 0 0 1px var(--rule); }
+.tr-head .btn { height: 28px; width: 28px; border-color: var(--rule); }
+.tr-meta { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--line); font-size: 11px; }
+.tr-meta select { height: 24px; font-size: 11px; padding: 0 22px 0 8px; max-width: 220px; }
+.tr-meta select.single { pointer-events: none; background-image: none; padding-right: 8px; border-color: transparent; padding-left: 0; }
+#tr-count { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#tr-list { flex: 1; overflow-y: auto; min-height: 0; padding: 4px 0 40px; }
+.cue { display: grid; grid-template-columns: 50px 1fr; gap: 8px; padding: 5px 12px 5px 10px; border-left: 2px solid transparent; cursor: pointer; font-size: 12.5px; line-height: 1.4; }
+.cue:hover { background: var(--panel-2); }
+.cue.active { border-left-color: var(--ink); background: var(--sel); }
+.cue.hit { background: var(--panel-3); }
+.cue .t { color: var(--dim); font-size: 10.5px; padding-top: 3px; letter-spacing: 0.02em; white-space: nowrap; }
+.cue .x { min-width: 0; overflow-wrap: anywhere; }
+.cue mark { background: var(--ink); color: var(--ink-fg); padding: 0 1px; }
+#tr-empty { padding: 16px 12px; font-size: 12.5px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
 
 /* ---- toasts ---- */
 #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }

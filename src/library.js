@@ -162,6 +162,7 @@ function buildItem({ url, dir, file, info }) {
     vcodec: info.vcodec,
     acodec: info.acodec,
     container: info.container,
+    subs: (() => { try { return fs.readdirSync(dir).filter((f) => /\.(vtt|srt|json3)$/i.test(f)).length; } catch { return 0; } })(),
     fetchedAt: Date.now(),
     lastOpenedAt: null,
     opens: 0,

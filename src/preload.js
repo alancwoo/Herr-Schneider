@@ -22,6 +22,10 @@ contextBridge.exposeInMainWorld('clipperrr', {
     clear: () => ipcRenderer.invoke('library:clear'),
     openFolder: () => ipcRenderer.invoke('library:openFolder'),
   },
+  transcript: {
+    load: (id) => ipcRenderer.invoke('transcript:load', id),
+    fetch: (id, jobId) => ipcRenderer.invoke('transcript:fetch', { id, jobId }),
+  },
   exportClip: (opts) => ipcRenderer.invoke('media:export', opts),
   cancel: (jobId) => ipcRenderer.invoke('job:cancel', jobId),
   showInFolder: (p) => ipcRenderer.invoke('shell:showItemInFolder', p),
