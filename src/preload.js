@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('clipperrr', {
   saveFileDialog: (defaultName, ext) => ipcRenderer.invoke('dialog:saveFile', { defaultName, ext }),
   load: (file) => ipcRenderer.invoke('media:load', file),
   proxy: (id) => ipcRenderer.invoke('media:proxy', id),
+  waveform: (id) => ipcRenderer.invoke('media:waveform', id),
   download: (url, jobId, force) => ipcRenderer.invoke('media:download', { url, jobId, force }),
   library: {
     list: () => ipcRenderer.invoke('library:list'),

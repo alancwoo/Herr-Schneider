@@ -21,6 +21,7 @@ Paste a link or drop a file. Mark in and out. Export.</p>
 ## Features
 
 - Drop in any file, or paste in a [yt-dlp](https://github.com/yt-dlp/yt-dlp)-compatible video link
+- Audio files too: drop in WAV, MP3, M4A, FLAC and more, clip on a waveform, export MP3, M4A, WAV or FLAC
 - Downloaded files remain in your library to clip or manage anytime
 - Easily re-encode, scale, or convert to animated GIF
 - Search the transcript and jump straight to a line, from the video's captions or its subtitle track
@@ -38,7 +39,7 @@ ffmpeg is bundled. yt-dlp is used from your PATH if you have it, otherwise it's 
 | Space | Play / pause |
 | P | Preview the clip |
 | M | Mute / unmute |
-| ← → | One frame (Shift: 1 s, Alt: 5 s) |
+| ← → | One frame, or 10 ms for audio (Shift: 1 s, Alt: 5 s) |
 | , . | One frame (Shift: 10 frames) |
 | I / O | Set in / out at the playhead |
 | [ ] | Jump to in / out |

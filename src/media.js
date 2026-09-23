@@ -7,8 +7,9 @@ const crypto = require('crypto');
 const { SUB_ARGS, TEXT_SUB_CODECS } = require('./transcript');
 
 const PLAYABLE_CONTAINERS = ['mov', 'mp4', 'm4a', '3gp', '3g2', 'mj2', 'matroska', 'webm'];
+const PLAYABLE_AUDIO_CONTAINERS = [...PLAYABLE_CONTAINERS, 'mp3', 'wav', 'flac', 'ogg'];
 const PLAYABLE_VIDEO = ['h264', 'vp8', 'vp9', 'av1'];
-const PLAYABLE_AUDIO = ['aac', 'mp3', 'opus', 'vorbis', 'flac', 'pcm_s16le'];
+const PLAYABLE_AUDIO = ['aac', 'mp3', 'opus', 'vorbis', 'flac', 'pcm_s16le', 'pcm_s24le', 'pcm_u8', 'pcm_f32le'];
 const PLAYABLE_PIXFMT = ['yuv420p', 'yuvj420p'];
 
 function run(bin, args, { onLine, cwd } = {}) {
@@ -67,13 +68,32 @@ async function probe(tools, file) {
   const subs = (data.streams || []).filter((s) => s.codec_type === 'subtitle')
     .map((s, i) => ({ index: i, codec: s.codec_name, lang: s.tags?.language || null, title: s.tags?.title || null }))
     .filter((s) => TEXT_SUB_CODECS.includes(s.codec));
-  if (!v) throw new Error('No video stream found in this file.');
+  if (!v && !a) throw new Error('No video or audio stream found in this file.');
+  const containers = (data.format?.format_name || '').split(',');
+  const duration = Number(data.format?.duration) || Number(v?.duration) || Number(a?.duration) || 0;
+  const audioInfo = a ? {
+    acodec: a.codec_name,
+    sampleRate: Number(a.sample_rate) || 0,
+    channels: Number(a.channels) || 0,
+    sampleFmt: a.sample_fmt || null,
+    bitsPerSample: Number(a.bits_per_raw_sample || a.bits_per_sample) || 0,
+    abitrate: Number(a.bit_rate) || Number(data.format?.bit_rate) || 0,
+  } : { acodec: null };
+  if (!v) {
+    // Audio-only file (album art counts as no video).
+    return {
+      path: file, name: path.basename(file),
+      size: Number(data.format?.size) || fs.statSync(file).size,
+      duration, width: 0, height: 0, fps: 0, vcodec: null, pixFmt: null,
+      container: containers[0], isAudio: true,
+      playable: containers.some((c) => PLAYABLE_AUDIO_CONTAINERS.includes(c)) && PLAYABLE_AUDIO.includes(a.codec_name),
+      subs, ...audioInfo,
+    };
+  }
   const rot = rotationOf(v);
   const swap = rot === 90 || rot === 270;
   const fpsParts = (v.avg_frame_rate || v.r_frame_rate || '0/1').split('/');
   const fps = fpsParts[1] ? Number(fpsParts[0]) / Number(fpsParts[1]) : Number(fpsParts[0]);
-  const duration = Number(data.format?.duration) || Number(v.duration) || 0;
-  const containers = (data.format?.format_name || '').split(',');
   const playable =
     containers.some((c) => PLAYABLE_CONTAINERS.includes(c)) &&
     PLAYABLE_VIDEO.includes(v.codec_name) &&
@@ -88,8 +108,9 @@ async function probe(tools, file) {
     height: swap ? v.width : v.height,
     fps: isFinite(fps) ? fps : 0,
     vcodec: v.codec_name,
-    acodec: a ? a.codec_name : null,
     pixFmt: v.pix_fmt,
+    isAudio: false,
+    ...audioInfo,
     container: containers[0],
     playable,
     subs,
@@ -114,7 +135,11 @@ function makeProxy(tools, info, proxyDir, onProgress) {
   const out = path.join(proxyDir, `${cacheKey(info.path)}.mp4`);
   if (fs.existsSync(out)) return { promise: Promise.resolve(out), cancel() {} };
   const tmp = out + '.part.mp4';
-  const args = [
+  const args = info.isAudio ? [
+    '-y', '-hide_banner', '-nostats', '-progress', 'pipe:1',
+    '-i', info.path, '-map', '0:a:0', '-vn',
+    '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-f', 'mp4', tmp,
+  ] : [
     '-y', '-hide_banner', '-nostats', '-progress', 'pipe:1',
     '-i', info.path,
     '-vf', "scale='trunc(min(1280,iw)/2)*2':-2",
@@ -141,18 +166,75 @@ function targetDims(info, quality, size) {
   return [Math.max(2, Math.round(w / 2) * 2), Math.max(2, Math.round(h / 2) * 2)];
 }
 
+// Audio-only outputs. WAV keeps 24-bit sources at 24 bits.
+const AUDIO_FORMATS = {
+  mp3: { args: (i, br) => ['-c:a', 'libmp3lame', '-b:a', `${br || 256}k`, '-id3v2_version', '3', '-f', 'mp3'] },
+  m4a: { args: (i, br) => ['-c:a', 'aac', '-b:a', `${br || 256}k`, '-movflags', '+faststart', '-f', 'ipod'] },
+  wav: { args: (i) => ['-c:a', (i.bitsPerSample > 16 || /^pcm_(s32|f32|f64)/.test(i.acodec || '')) ? 'pcm_s24le' : 'pcm_s16le', '-f', 'wav'] },
+  flac: { args: (i) => ['-c:a', 'flac', '-f', 'flac'] },
+};
+
+// Waveform peaks: decode to mono float at a low rate and keep a min/max pair per
+// bucket as signed bytes. `rate` buckets per second, capped so long files stay small.
+function waveform(tools, info, cacheDir) {
+  fs.mkdirSync(cacheDir, { recursive: true });
+  // Whole samples per bucket, so bucket i starts exactly at i / rate seconds.
+  const sr = 16000;
+  const per = Math.max(16, Math.ceil(sr / Math.min(1000, 1.5e6 / Math.max(1, info.duration))));
+  const rate = sr / per;
+  const out = path.join(cacheDir, `${cacheKey(info.path)}-${per}.peaks`);
+  if (fs.existsSync(out)) return { promise: Promise.resolve({ rate, peaks: fs.readFileSync(out) }), cancel() {} };
+  const child = spawn(tools.ffmpeg, ['-hide_banner', '-nostats', '-v', 'error', '-i', info.path, '-map', '0:a:0', '-vn', '-ac', '1', '-ar', String(sr), '-f', 'f32le', 'pipe:1'], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const chunks = [];
+  let cur = Buffer.alloc(0), cancelled = false, stderr = '';
+  let mn = 1, mx = -1, n = 0;
+  const pairs = [];
+  const flush = () => { pairs.push(Math.max(-127, Math.round(mn * 127)), Math.min(127, Math.round(mx * 127))); mn = 1; mx = -1; n = 0; };
+  child.stdout.on('data', (b) => {
+    cur = cur.length ? Buffer.concat([cur, b]) : b;
+    const count = Math.floor(cur.length / 4);
+    for (let i = 0; i < count; i++) {
+      const v = cur.readFloatLE(i * 4);
+      if (v < mn) mn = v; if (v > mx) mx = v;
+      if (++n >= per) flush();
+      if (pairs.length >= 65536) { chunks.push(Int8Array.from(pairs)); pairs.length = 0; }
+    }
+    cur = cur.subarray(count * 4);
+  });
+  child.stderr.on('data', (b) => { stderr = (stderr + b).slice(-4000); });
+  const promise = new Promise((resolve, reject) => {
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (cancelled) return reject(Object.assign(new Error('Cancelled'), { cancelled: true }));
+      if (code !== 0) return reject(new Error(`Waveform failed: ${stderr.trim().split('\n').pop()}`));
+      if (n) flush();
+      chunks.push(Int8Array.from(pairs));
+      const buf = Buffer.concat(chunks.map((c) => Buffer.from(c.buffer, c.byteOffset, c.byteLength)));
+      try { fs.writeFileSync(out, buf); } catch {}
+      resolve({ rate, peaks: buf });
+    });
+  });
+  return { promise, cancel: () => { cancelled = true; child.kill('SIGTERM'); } };
+}
+
 // Export the [start, end] range of info.path to output.
 // format:  'mp4' | 'gif'
 // mode:    'copy' (fast, keyframe-accurate) | 'encode' (frame-accurate)   (mp4 only)
 // quality: 'original' | '1080' | '720'      size: 100 | 50 | 25   (encode/gif only)
 // audio:   include the audio track          fps: gif frame rate
-function exportClip(tools, { info, start, end, mode, quality, size, audio, format, fps, output }, onProgress) {
+function exportClip(tools, { info, start, end, mode, quality, size, audio, format, fps, abitrate, output }, onProgress) {
   // Floor the start to the millisecond so a frame sitting exactly on the in-point is never
   // discarded by ffmpeg's accurate seek; the duration is rounded up for the same reason.
   const ss = Math.floor(start * 1000) / 1000;
   const duration = Math.max(0.01, Math.ceil((end - ss) * 1000) / 1000);
   const args = ['-y', '-hide_banner', '-nostats', '-progress', 'pipe:1'];
   args.push('-ss', ss.toFixed(3), '-i', info.path, '-t', duration.toFixed(3));
+  if (AUDIO_FORMATS[format]) {
+    args.push('-map', '0:a:0', '-vn', '-sn', '-map_metadata', '0');
+    args.push(...AUDIO_FORMATS[format].args(info, abitrate), output);
+    const job = run(tools.ffmpeg, args, { onLine: ffmpegProgress(duration, onProgress) });
+    return { promise: job.promise.then(() => output), cancel: job.cancel };
+  }
   const [w, h] = targetDims(info, quality, size);
   if (format === 'gif') {
     const rate = Math.min(Number(fps) || 15, info.fps > 0 ? Math.ceil(info.fps) : 30);
@@ -175,7 +257,7 @@ function exportClip(tools, { info, start, end, mode, quality, size, audio, forma
   return { promise: job.promise.then(() => output), cancel: job.cancel };
 }
 
-const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|flv|ts|mpg|mpeg|3gp|ogv)$/i;
+const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|flv|ts|mpg|mpeg|3gp|ogv|mp3|m4a|aac|opus|ogg|oga|wav|flac)$/i;
 
 // Fetch a URL with yt-dlp into dir (one folder per download), preferring a
 // browser-playable MP4. Also saves the page metadata (info.json), thumbnail and
@@ -214,4 +296,4 @@ function download(tools, url, dir, onProgress) {
   return { promise, cancel: job.cancel };
 }
 
-module.exports = { run, probe, makeProxy, exportClip, download, targetDims, cacheKey };
+module.exports = { run, probe, makeProxy, exportClip, download, targetDims, cacheKey, waveform, AUDIO_FORMATS };

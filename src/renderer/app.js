@@ -40,7 +40,9 @@ function toast(msg, kind = '', actions = []) {
   setTimeout(() => el.remove(), kind === 'err' ? 12000 : 6000);
   return el;
 }
-const fpsOf = () => (state.info && state.info.fps > 0 ? state.info.fps : 30);
+// Audio has no frames; step and snap on a 10 ms grid instead.
+const isAudio = () => !!(state.info && state.info.isAudio);
+const fpsOf = () => (isAudio() ? 100 : state.info && state.info.fps > 0 ? state.info.fps : 30);
 const frameDur = () => 1 / fpsOf();
 const frameOf = (t) => Math.round(t * fpsOf());
 const snapFrame = (t) => frameOf(t) / fpsOf();
@@ -99,6 +101,11 @@ async function loadFile(file) {
     state.id = id; state.info = info; state.duration = info.duration;
     state.inT = 0; state.outT = info.duration; state.view = [0, info.duration];
     $('empty').hidden = true; $('controls').hidden = false;
+    document.body.classList.toggle('audio-mode', !!info.isAudio);
+    $('audio-view').hidden = !info.isAudio;
+    if (info.isAudio) { $('av-title').textContent = info.name; $('av-meta').textContent = [audioDesc(info), fmtShort(info.duration), fmtBytes(info.size)].filter(Boolean).join(' · '); }
+    buildFormats();
+    loadWaveform();
     document.title = `${info.name} — Herr Schneider`;
     updateExportUI();
     loadTranscript();
@@ -198,7 +205,31 @@ async function refreshTools() {
 }
 
 // ---------- export ----------
-const EXPORT_FIELDS = ['mode', 'quality', 'size', 'fps', 'format'];
+const EXPORT_FIELDS = ['mode', 'quality', 'size', 'fps', 'abr'];
+const FORMATS = {
+  mp4: 'MP4 video', gif: 'Animated GIF',
+  mp3: 'MP3 audio', m4a: 'M4A audio (AAC)', wav: 'WAV audio', flac: 'FLAC audio',
+};
+const AUDIO_OUT = ['mp3', 'm4a', 'wav', 'flac'];
+const isAudioOut = (f) => AUDIO_OUT.includes(f);
+// The format list depends on the source: audio files only get audio formats; videos
+// with sound can also export just their audio. Remember the last choice per kind.
+let lastFormat = { video: 'mp4', audio: 'mp3' };
+try { Object.assign(lastFormat, JSON.parse(localStorage.getItem('lastFormat') || '{}')); } catch {}
+function buildFormats() {
+  const sel = $('format');
+  const list = isAudio() ? AUDIO_OUT : ['mp4', 'gif', ...(state.info && state.info.acodec ? AUDIO_OUT : [])];
+  sel.innerHTML = '';
+  for (const f of list) { const o = document.createElement('option'); o.value = f; o.textContent = FORMATS[f]; sel.appendChild(o); }
+  const want = lastFormat[isAudio() ? 'audio' : 'video'];
+  sel.value = list.includes(want) ? want : list[0];
+}
+$('format').addEventListener('change', () => {
+  lastFormat[isAudio() ? 'audio' : 'video'] = $('format').value;
+  try { localStorage.setItem('lastFormat', JSON.stringify(lastFormat)); } catch {}
+  updateExportUI();
+});
+buildFormats();
 let audioOn = true;
 function setAudio(on) {
   audioOn = on;
@@ -207,7 +238,7 @@ function setAudio(on) {
 }
 $('audio').onclick = () => { setAudio(!audioOn); updateExportUI(); };
 function exportSettings() {
-  return { mode: $('mode').value, quality: $('quality').value, size: Number($('size').value), fps: Number($('fps').value), audio: audioOn, format: $('format').value };
+  return { mode: $('mode').value, quality: $('quality').value, size: Number($('size').value), fps: Number($('fps').value), abitrate: Number($('abr').value), audio: audioOn, format: $('format').value || 'mp4' };
 }
 function targetDims(info, quality, size) {
   let w = info.width, h = info.height;
@@ -227,6 +258,15 @@ function pixelsOf(o) {
   const clip = Math.max(0, state.outT - state.inT);
   const fps = o.format === 'gif' ? Math.min(o.fps, Math.ceil(fpsOf())) : fpsOf();
   return { w, h, clip, fps, px: w * h * fps * clip };
+}
+function estimateAudio(o) {
+  const i = state.info;
+  const clip = Math.max(0, state.outT - state.inT);
+  const sr = i.sampleRate || 48000, ch = Math.min(2, i.channels || 2) || 2;
+  const wavBits = (i.bitsPerSample > 16 || /^pcm_(s32|f32|f64)/.test(i.acodec || '')) ? 24 : 16;
+  const wav = sr * (i.channels || 2) * (wavBits / 8) * clip;
+  const bytes = o.format === 'wav' ? wav : o.format === 'flac' ? wav * 0.6 : (o.abitrate * 1000 / 8) * clip;
+  return { clip, bytes, secs: Math.max(0.3, clip * (o.format === 'mp3' ? 0.012 : 0.006)), sr, ch, wavBits };
 }
 function estimate(o) {
   const info = state.info;
@@ -258,18 +298,37 @@ function fitMiddle(el, head, tail) {
   fits(lo);
 }
 function fmtSecs(s) { return s < 1 ? '< 1 s' : s < 90 ? `≈ ${Math.round(s)} s` : `≈ ${Math.round(s / 60)} min`; }
-function codecName(c) { return ({ h264: 'H.264', hevc: 'HEVC', vp9: 'VP9', vp8: 'VP8', av1: 'AV1', mpeg4: 'MPEG-4', aac: 'AAC', mp3: 'MP3', opus: 'Opus', vorbis: 'Vorbis', flac: 'FLAC' })[c] || (c || '').toUpperCase(); }
+function codecName(c) { return ({ h264: 'H.264', hevc: 'HEVC', vp9: 'VP9', vp8: 'VP8', av1: 'AV1', mpeg4: 'MPEG-4', aac: 'AAC', mp3: 'MP3', opus: 'Opus', vorbis: 'Vorbis', flac: 'FLAC', alac: 'ALAC', wmav2: 'WMA' })[c] || (/^pcm_/.test(c || '') ? 'PCM' : (c || '').toUpperCase()); }
+function fmtRate(hz) { return hz ? `${(hz / 1000).toFixed(1).replace(/\.0$/, '')} kHz` : null; }
+function fmtChannels(n) { return n === 1 ? 'mono' : n === 2 ? 'stereo' : n ? `${n} ch` : null; }
+function audioDesc(i) {
+  return [fmtRate(i.sampleRate), fmtChannels(i.channels), codecName(i.acodec), i.abitrate && !/^pcm_|flac|alac/.test(i.acodec) ? `${Math.round(i.abitrate / 1000)} kbps` : null].filter(Boolean).join(' · ');
+}
 function updateExportUI() {
   const o = exportSettings();
   const gif = o.format === 'gif';
-  const copy = !gif && o.mode === 'copy';
+  const aud = isAudioOut(o.format);
+  const copy = !gif && !aud && o.mode === 'copy';
   const hasAudio = !!(state.info && state.info.acodec);
-  $('mode-field').hidden = gif;
-  $('quality-field').hidden = copy;
-  $('size-field').hidden = copy;
+  $('mode-field').hidden = gif || aud;
+  $('quality-field').hidden = copy || aud;
+  $('size-field').hidden = copy || aud;
   $('fps-field').hidden = !gif;
-  $('audio-field').hidden = gif || !hasAudio;
-  if (state.info) {
+  $('audio-field').hidden = gif || aud || !hasAudio;
+  $('abr-field').hidden = !(o.format === 'mp3' || o.format === 'm4a');
+  if (state.info && (aud || isAudio())) {
+    const i = state.info;
+    const srcRest = [i.isAudio ? null : `${i.width}×${i.height}`, audioDesc(i), fmtShort(i.duration)].filter(Boolean).join(' · ');
+    fitMiddle($('src-desc'), i.name, ' · ' + srcRest);
+    const e = estimateAudio(o);
+    const parts = [`Clip ${e.clip.toFixed(2)} s`, fmtRate(e.sr)];
+    if (o.format === 'wav') parts.push(`${e.wavBits}-bit PCM`, 'WAV');
+    else if (o.format === 'flac') parts.push('FLAC');
+    else if (o.format === 'mp3') parts.push(`${o.abitrate} kbps`, 'MP3');
+    else parts.push('AAC', `${o.abitrate} kbps`, 'M4A');
+    parts.push(`≈ ${fmtBytes(e.bytes)}`, fmtSecs(e.secs));
+    fitMiddle($('out-desc'), parts.filter(Boolean).join(' · '), '');
+  } else if (state.info) {
     const i = state.info;
     const srcRest = [`${i.width}×${i.height}`, i.fps ? `${i.fps.toFixed(3).replace(/\.?0+$/, '')} fps` : null, [codecName(i.vcodec), i.acodec ? codecName(i.acodec) : null].filter(Boolean).join(' / '), fmtShort(i.duration)].filter(Boolean).join(' · ');
     fitMiddle($('src-desc'), i.name, ' · ' + srcRest);
@@ -286,7 +345,7 @@ function updateExportUI() {
 for (const id of EXPORT_FIELDS) $(id).addEventListener('change', updateExportUI);
 try {
   const saved = JSON.parse(localStorage.getItem('export') || 'null');
-  if (saved) { for (const id of EXPORT_FIELDS) if (saved[id] != null) $(id).value = String(saved[id]); if (saved.audio != null) setAudio(!!saved.audio); }
+  if (saved) { for (const id of EXPORT_FIELDS) if (saved[id] != null) $(id).value = String(saved[id]); if (saved.audio != null) setAudio(!!saved.audio); if (saved.abitrate) $('abr').value = String(saved.abitrate); }
 } catch {}
 updateExportUI();
 
@@ -294,12 +353,12 @@ async function doExport() {
   if (!state.id || state.activeJob) return;
   if (state.outT - state.inT < 0.05) return toast('Selection is too short.', 'err');
   const o = exportSettings();
-  const ext = o.format === 'gif' ? 'gif' : 'mp4';
+  const ext = FORMATS[o.format] ? o.format : 'mp4';
   const base = state.info.name.replace(/\.[^.]+$/, '');
   const output = await api.saveFileDialog(`${base} [${fmtShort(state.inT).replace(/:/g, '.')}-${fmtShort(state.outT).replace(/:/g, '.')}].${ext}`, ext);
   if (!output) return;
   const jobId = newJobId('export');
-  busy(ext === 'gif' ? 'Exporting GIF…' : o.mode === 'copy' ? 'Exporting (fast copy)…' : 'Exporting (re-encoding)…');
+  busy(isAudioOut(ext) ? `Exporting ${ext.toUpperCase()}…` : ext === 'gif' ? 'Exporting GIF…' : o.mode === 'copy' ? 'Exporting (fast copy)…' : 'Exporting (re-encoding)…');
   state.activeJob = jobId;
   video.pause();
   const t0 = performance.now();
@@ -307,7 +366,7 @@ async function doExport() {
     const r = await api.exportClip({ id: state.id, start: state.inT, end: state.outT, ...o, output, jobId });
     unbusy();
     // Learn this machine's real throughput for future estimates.
-    const key = o.format === 'gif' ? 'gif' : o.mode === 'copy' ? null : 'encode';
+    const key = isAudioOut(o.format) ? null : o.format === 'gif' ? 'gif' : o.mode === 'copy' ? null : 'encode';
     if (key) {
       const secs = (performance.now() - t0) / 1000;
       const { px } = pixelsOf(o);
@@ -381,11 +440,12 @@ function render() {
   const a = xOf(state.inT), b = xOf(state.outT);
   $('selection').style.left = `${a}px`; $('selection').style.width = `${Math.max(0, b - a)}px`;
   $('handle-in').style.left = `${a}px`; $('handle-out').style.left = `${b}px`;
-  renderRuler(); renderPlayhead(); drawStrip(); renderNav();
+  renderRuler(); renderPlayhead(); drawStrip(); renderNav(); drawStageWave();
 }
 function renderPlayhead() {
   $('t-cur').textContent = fmt(video.currentTime);
-  $('t-frame').textContent = state.info ? `Frame ${frameOf(video.currentTime)}` : '';
+  $('t-frame').textContent = state.info && !isAudio() ? `Frame ${frameOf(video.currentTime)}` : '';
+  if (isAudio() && state.duration) $('av-playhead').style.left = `${(video.currentTime / state.duration) * $('av-wave').clientWidth}px`;
   $('playhead').style.left = `${xOf(video.currentTime)}px`;
   if (state.duration) $('nav-playhead').style.left = `${(video.currentTime / state.duration) * nav.clientWidth}px`;
   transcriptFollow(video.currentTime);
@@ -559,7 +619,7 @@ async function renderLibrary() {
     const l1 = document.createElement('div'); l1.className = 'lib-line';
     l1.textContent = [it.uploader, it.domain, fmtUploadDate(it.uploadDate) && `published ${fmtUploadDate(it.uploadDate)}`].filter(Boolean).join(' · ');
     const l2 = document.createElement('div'); l2.className = 'lib-line';
-    l2.textContent = [fmtShort(it.duration), `${it.width}×${it.height}`, it.fps ? `${Math.round(it.fps)} fps` : null, [it.vcodec, it.acodec].filter(Boolean).join('/'), fmtBytes(it.size)].filter(Boolean).join(' · ');
+    l2.textContent = [fmtShort(it.duration), it.width ? `${it.width}×${it.height}` : 'Audio', it.fps ? `${Math.round(it.fps)} fps` : null, [it.vcodec, it.acodec].filter(Boolean).join('/'), fmtBytes(it.size)].filter(Boolean).join(' · ');
     const l3 = document.createElement('div'); l3.className = 'lib-line';
     l3.append(`Fetched ${ago(it.fetchedAt)}${it.opens > 1 ? `, opened ${it.opens}×` : ''} from `);
     const a = document.createElement('a'); a.href = '#'; a.textContent = it.webpageUrl; a.title = 'Open the original page in your browser';
@@ -608,7 +668,8 @@ function resetThumbs(src) {
   thumbs.cache.clear(); thumbs.queue.length = 0; thumbs.busy = false; thumbs.gen++;
   thumbs.src = src;
   thumbs.aspect = state.info && state.info.height ? state.info.width / state.info.height : 16 / 9;
-  thumbVideo.src = src; hoverVideo.src = src;
+  if (isAudio()) { thumbs.src = null; thumbVideo.removeAttribute('src'); hoverVideo.removeAttribute('src'); thumbVideo.load(); hoverVideo.load(); }
+  else { thumbVideo.src = src; hoverVideo.src = src; }
   drawStrip();
 }
 
@@ -664,6 +725,7 @@ function drawStrip() {
   const ctx = strip.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
+  if (isAudio()) return drawStripWave(ctx, W, H);
   if (!state.id || !thumbs.src) return;
   const sw = thumbSlotWidth();
   const secPerPx = viewLen() / W;
@@ -700,7 +762,8 @@ async function showHover(clientX) {
   const pv = $('hover-preview'); pv.hidden = false;
   const pw = pv.offsetWidth;
   pv.style.left = `${clamp(x - pw / 2, 0, rect.width - pw)}px`;
-  $('hover-time').textContent = `${fmt(t)} · f${frameOf(t)}`;
+  $('hover-time').textContent = isAudio() ? fmt(t) : `${fmt(t)} · f${frameOf(t)}`;
+  if (isAudio()) return;
   hoverPending = t;
   if (hoverBusy) return;
   hoverBusy = true;
@@ -722,6 +785,98 @@ track.addEventListener('mousemove', (e) => { if (state.id) showHover(e.clientX);
 track.addEventListener('mouseleave', () => { if (!drag) hideHover(); });
 window.addEventListener('mousemove', (e) => { if (drag && state.id) showHover(e.clientX); });
 window.addEventListener('mouseup', () => setTimeout(() => { if (!track.matches(':hover')) hideHover(); }, 0));
+
+// ---------- waveform (audio files) ----------
+const wave = { id: null, rate: 0, peaks: null, gain: 1 };
+async function loadWaveform() {
+  const id = state.id;
+  wave.id = id; wave.peaks = null;
+  if (!state.info.isAudio) return;
+  try {
+    const r = await api.waveform(id);
+    if (state.id !== id || !r) return;
+    wave.rate = r.rate;
+    wave.peaks = new Int8Array(r.peaks.buffer, r.peaks.byteOffset, r.peaks.byteLength);
+    // Normalise so quiet recordings still read clearly.
+    let peak = 1;
+    for (let i = 0; i < wave.peaks.length; i++) { const v = Math.abs(wave.peaks[i]); if (v > peak) peak = v; }
+    wave.gain = 127 / Math.max(12, peak);
+    render();
+  } catch (e) { if (!e.message?.includes('Cancelled')) toast(`Could not draw the waveform: ${e.message}`, 'err'); }
+}
+// Min/max envelope for [t0, t1) as fractions of full scale.
+function envelope(t0, t1) {
+  const p = wave.peaks, n = p.length / 2;
+  let i0 = Math.floor(t0 * wave.rate), i1 = Math.max(i0 + 1, Math.floor(t1 * wave.rate));
+  i0 = clamp(i0, 0, n); i1 = clamp(i1, 0, n);
+  let mn = 0, mx = 0;
+  for (let i = i0; i < i1; i++) { if (p[2 * i] < mn) mn = p[2 * i]; if (p[2 * i + 1] > mx) mx = p[2 * i + 1]; }
+  return [Math.max(-1, (mn * wave.gain) / 127), Math.min(1, (mx * wave.gain) / 127)];
+}
+// Draw [a, b] into a canvas region, one column per device pixel. Columns inside the
+// selection use `on`, the rest `off`.
+function paintWave(ctx, W, H, a, b, on, off) {
+  const dpr = devicePixelRatio || 1;
+  const cols = Math.round(W * dpr);
+  const spc = (b - a) / cols;
+  const mid = (H * dpr) / 2, amp = (H * dpr) / 2 - 1;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (let x = 0; x < cols; x++) {
+    const t0 = a + x * spc;
+    const [mn, mx] = envelope(t0, t0 + spc);
+    const y0 = Math.floor(mid - mx * amp), y1 = Math.ceil(mid - mn * amp);
+    ctx.fillStyle = t0 + spc > state.inT && t0 < state.outT ? on : off;
+    ctx.fillRect(x, y0, 1, Math.max(1, y1 - y0));
+  }
+  ctx.restore();
+}
+const cssVar = (n) => getComputedStyle(document.body).getPropertyValue(n).trim();
+function drawStripWave(ctx, W, H) {
+  if (!wave.peaks) { ctx.fillStyle = 'rgba(128,128,128,0.10)'; ctx.fillRect(0, 0, W, H); return; }
+  ctx.fillStyle = cssVar('--line'); ctx.fillRect(0, Math.round(H / 2), W, 1);
+  paintWave(ctx, W, H, state.view[0], state.view[1], cssVar('--text'), cssVar('--dim'));
+  const a = xOf(state.inT), b = xOf(state.outT);
+  ctx.fillStyle = cssVar('--scrim');
+  ctx.globalAlpha = 0.5;
+  if (a > 0) ctx.fillRect(0, 0, a, H);
+  if (b < W) ctx.fillRect(b, 0, W - b, H);
+  ctx.globalAlpha = 1;
+}
+// The stage shows the whole file, the selection bright and the rest dimmed.
+function drawStageWave() {
+  if (!isAudio()) return;
+  const box = $('av-wave'), c = $('av-canvas');
+  const W = box.clientWidth, H = box.clientHeight, dpr = devicePixelRatio || 1;
+  if (!W || !H) return;
+  if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  const ctx = c.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height);
+  ctx.fillStyle = '#333'; ctx.fillRect(0, Math.round(c.height / 2), c.width, 1);
+  if (wave.peaks) paintWave(ctx, W, H, 0, state.duration, '#f2f2f2', '#555555');
+  renderPlayhead();
+}
+// Click the stage waveform to seek; drag to select a range, like the filmstrip.
+$('av-wave').addEventListener('mousedown', (e) => {
+  if (!isAudio()) return;
+  e.preventDefault();
+  const box = $('av-wave');
+  const tAt = (ev) => clamp(((ev.clientX - box.getBoundingClientRect().left) / box.clientWidth) * state.duration, 0, state.duration);
+  const t0 = snapFrame(tAt(e));
+  let moved = false;
+  const move = (ev) => {
+    if (!moved && Math.abs(ev.clientX - e.clientX) < 4) return;
+    moved = true;
+    const t = tAt(ev);
+    state.inT = clamp(snapFrame(Math.min(t0, t)), 0, state.duration);
+    state.outT = clamp(Math.max(snapFrame(Math.max(t0, t)), state.inT + frameDur()), 0, state.duration);
+    render(); scrubTo(t);
+  };
+  const up = () => { if (!moved) seek(t0); endScrub(); renderPlayhead(); window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+  window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+});
+$('av-wave').addEventListener('mousemove', (e) => { const box = $('av-wave'); $('av-hover').hidden = false; $('av-hover').style.left = `${e.clientX - box.getBoundingClientRect().left}px`; });
+$('av-wave').addEventListener('mouseleave', () => { $('av-hover').hidden = true; });
+new ResizeObserver(() => drawStageWave()).observe($('av-wave'));
 
 // ---------- transcript sidebar ----------
 const tr = { tracks: [], fetchable: false, cues: [], rows: [], active: -1, hits: [], hit: -1, query: '', loadedFor: null };

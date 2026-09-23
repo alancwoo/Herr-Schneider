@@ -100,6 +100,15 @@ body.mac #topbar { padding-left: 84px; }
 #main { display: flex; flex: 1; min-height: 0; }
 #stage { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--stage); display: flex; align-items: center; justify-content: center; }
 #video { width: 100%; height: 100%; object-fit: contain; outline: none; }
+body.audio-mode #video { visibility: hidden; position: absolute; }
+#audio-view { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 28px 32px 32px; gap: 20px; color: #f2f2f2; }
+.av-head { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#av-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#av-meta { font-size: 11px; color: #8c8c8c; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#av-wave { position: relative; flex: 1; min-height: 60px; cursor: crosshair; border-top: 1px solid #333; border-bottom: 1px solid #333; }
+#av-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#av-playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: #ffffff; pointer-events: none; }
+#av-hover { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.45); pointer-events: none; }
 .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--scrim); z-index: 20; }
 #empty { background: var(--bg); }
 .empty-card { text-align: center; max-width: 520px; }
@@ -173,6 +182,7 @@ select:disabled { opacity: 0.5; }
 #strip { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #hoverline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink); z-index: 4; pointer-events: none; opacity: 0.9; }
 #hover-preview { position: absolute; bottom: calc(100% - 14px); z-index: 30; pointer-events: none; background: var(--panel); border: 1px solid var(--rule); padding: 3px; }
+body.audio-mode #hover-canvas { display: none; }
 #hover-canvas { display: block; width: 176px; height: 99px; background: var(--stage); }
 #hover-time { font-size: 10.5px; padding: 4px 2px 1px; color: var(--text); text-align: center; letter-spacing: 0.02em; }
 .offscreen { position: absolute; left: -9999px; top: 0; width: 8px; height: 8px; opacity: 0; pointer-events: none; }

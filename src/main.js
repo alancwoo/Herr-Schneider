@@ -25,7 +25,7 @@ let lastOpen = { key: '', at: 0 };
 const loaded = new Map(); // id -> { info, src path }
 let library = null;
 const jobs = new Map(); // jobId -> cancel()
-const MIME = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mkv': 'video/x-matroska', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
+const MIME = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mkv': 'video/x-matroska', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.wav': 'audio/wav', '.flac': 'audio/flac', '.ogg': 'audio/ogg', '.oga': 'audio/ogg', '.opus': 'audio/ogg', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
 
 function userDir(sub) {
   const d = path.join(app.getPath('userData'), sub);
@@ -81,7 +81,7 @@ function buildMenu() {
     {
       label: 'File',
       submenu: [
-        { label: 'Open Video…', accelerator: 'CmdOrCtrl+O', click: send('open') },
+        { label: 'Open Video or Audio…', accelerator: 'CmdOrCtrl+O', click: send('open') },
         { label: 'Open Link…', accelerator: 'CmdOrCtrl+L', click: send('link') },
         { label: 'Library', accelerator: 'CmdOrCtrl+B', click: send('library') },
         { type: 'separator' },
@@ -185,7 +185,7 @@ ipcMain.handle('dialog:openFile', async () => {
   const r = await dialog.showOpenDialog(win, {
     properties: ['openFile'],
     filters: [
-      { name: 'Video', extensions: ['mp4', 'mov', 'm4v', 'mkv', 'webm', 'avi', 'wmv', 'flv', 'ts', 'm2ts', 'mts', 'mpg', 'mpeg', '3gp', 'ogv', 'gif'] },
+      { name: 'Video and Audio', extensions: ['mp4', 'mov', 'm4v', 'mkv', 'webm', 'avi', 'wmv', 'flv', 'ts', 'm2ts', 'mts', 'mpg', 'mpeg', '3gp', 'ogv', 'gif', 'mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'oga', 'opus', 'aif', 'aiff', 'aifc', 'wma', 'alac', 'caf', 'mka', 'amr', 'ac3', 'dts', 'mp2'] },
       { name: 'All Files', extensions: ['*'] },
     ],
   });
@@ -195,7 +195,7 @@ ipcMain.handle('dialog:openFile', async () => {
 ipcMain.handle('dialog:saveFile', async (_e, { defaultName, ext }) => {
   const r = await dialog.showSaveDialog(win, {
     defaultPath: path.join(app.getPath('videos') || app.getPath('home'), defaultName),
-    filters: [ext === 'gif' ? { name: 'Animated GIF', extensions: ['gif'] } : { name: 'MP4 Video', extensions: ['mp4'] }],
+    filters: [{ name: ({ gif: 'Animated GIF', mp4: 'MP4 Video', mp3: 'MP3 Audio', m4a: 'M4A Audio', wav: 'WAV Audio', flac: 'FLAC Audio' })[ext] || ext.toUpperCase(), extensions: [ext] }],
   });
   if (r.canceled || !r.filePath) return null;
   return r.filePath.toLowerCase().endsWith('.' + ext) ? r.filePath : r.filePath + '.' + ext;
@@ -208,6 +208,14 @@ ipcMain.handle('media:load', async (_e, file) => {
   const id = crypto.randomBytes(8).toString('hex');
   loaded.set(id, { info, proxy: null });
   return { id, info, src: `clip://media/${id}` };
+});
+
+ipcMain.handle('media:waveform', async (_e, id) => {
+  const entry = loaded.get(id);
+  if (!entry) throw new Error('Unknown media id');
+  if (!entry.info.acodec) return null;
+  const r = await track(`wave-${id}`, media.waveform(tools(), entry.info, userDir('waveforms')));
+  return { rate: r.rate, peaks: new Uint8Array(r.peaks.buffer, r.peaks.byteOffset, r.peaks.byteLength) };
 });
 
 ipcMain.handle('media:proxy', async (_e, id) => {

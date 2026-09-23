@@ -8,7 +8,7 @@
 </head>
 <body>
 <header id="topbar">
-  <button id="btn-open" class="btn" title="Open a video file (Ctrl/Cmd+O)">Open file</button>
+  <button id="btn-open" class="btn" title="Open a video or audio file (Ctrl/Cmd+O)">Open file</button>
   <form id="url-form" autocomplete="off">
     <input id="url-input" type="text" placeholder="Paste a YouTube / any video link and press Enter (Ctrl/Cmd+L)" spellcheck="false" />
     <button id="btn-fetch" class="btn primary" type="submit">Fetch</button>
@@ -20,9 +20,13 @@
 <div id="main">
 <main id="stage">
   <video id="video" preload="auto" playsinline></video>
+  <div id="audio-view" hidden>
+    <div class="av-head"><div id="av-title"></div><div id="av-meta"></div></div>
+    <div id="av-wave"><canvas id="av-canvas"></canvas><div id="av-playhead"></div><div id="av-hover" hidden></div></div>
+  </div>
   <div id="empty" class="overlay">
     <div class="empty-card">
-      <div class="big">Drop a video here</div>
+      <div class="big">Drop a video or audio file here</div>
       <div class="dim">or open a file, or paste a link above</div>
       <div class="rule"></div>
       <div id="wordmark" aria-label="Herr Schneider"></div>
@@ -110,10 +114,7 @@
   <div class="row export">
     <div class="field" title="Output container">
       <span class="flabel">Export Format</span>
-      <select id="format">
-        <option value="mp4">MP4 video</option>
-        <option value="gif">Animated GIF</option>
-      </select>
+      <select id="format"></select>
     </div>
     <div class="field" id="mode-field" title="Fast copies the original streams without re-encoding (start snaps to a keyframe). Precise re-encodes and is frame-accurate.">
       <span class="flabel">Mode</span>
@@ -145,6 +146,15 @@
         <option value="15" selected>15</option>
         <option value="20">20</option>
         <option value="30">30</option>
+      </select>
+    </div>
+    <div class="field" id="abr-field" title="Audio bitrate" hidden>
+      <span class="flabel">Bitrate</span>
+      <select id="abr">
+        <option value="320">320 kbps</option>
+        <option value="256" selected>256 kbps</option>
+        <option value="192">192 kbps</option>
+        <option value="128">128 kbps</option>
       </select>
     </div>
     <div class="field" id="audio-field" title="Include the audio track">
@@ -194,7 +204,7 @@
       <tr><td>Space</td><td>Play / pause</td></tr>
       <tr><td>P</td><td>Preview trimmed clip</td></tr>
       <tr><td>M</td><td>Mute / unmute (unmuted = audible scrubbing)</td></tr>
-      <tr><td>← / →</td><td>Step one frame</td></tr>
+      <tr><td>← / →</td><td>Step one frame (audio: 10 ms)</td></tr>
       <tr><td>Shift + ← / →</td><td>Move playhead 1 s</td></tr>
       <tr><td>Alt + ← / →</td><td>Move playhead 5 s</td></tr>
       <tr><td>, / .</td><td>Step one frame (Shift: 10 frames)</td></tr>
